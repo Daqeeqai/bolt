@@ -98,6 +98,13 @@ export class AuthService {
 
   /**
    * Sign out the current user
+  async resetPassword(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+
+    return { error };
+  },
    */
   static async signOut(): Promise<{ error: AuthError | null }> {
     const { error } = await supabase.auth.signOut();

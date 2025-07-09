@@ -7,10 +7,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Zap, Mail, Lock, User, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { useToast } from '@/hooks/use-toast';
 
 export const LoginForm: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
   const [showPassword, setShowPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -18,7 +20,8 @@ export const LoginForm: React.FC = () => {
     role: 'agent' as 'admin' | 'agent'
   });
 
-  const { signIn, signUp, loading, error } = useAppStore();
+  const { signIn, signUp, resetPassword, loading, error } = useAppStore();
+  const { toast } = useToast();
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -38,9 +41,39 @@ export const LoginForm: React.FC = () => {
     const success = await signUp(formData.email, formData.password, formData.fullName, formData.role);
     if (success) {
       setActiveTab('signin');
+      toast({
+        title: "Account created successfully",
+        description: "You can now sign in with your credentials.",
+      });
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.email) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address to reset your password.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    const success = await resetPassword(formData.email);
+    if (success) {
+      toast({
+        title: "Password reset email sent",
+        description: "Check your inbox for instructions to reset your password.",
+      });
+      setShowForgotPassword(false);
+    } else {
+      toast({
+        title: "Reset failed",
+        description: "Unable to send password reset email. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
   const togglePasswordVisibility = () => {
     setShowPassword(!showPassword);
   };
@@ -90,15 +123,93 @@ export const LoginForm: React.FC = () => {
             </TabsList>
 
             <TabsContent value="signin" className="space-y-4 mt-6">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              {!showForgotPassword ? (
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-email" className="text-sm font-semibold text-gray-700">
+                      Email Address
+                    </Label>
+                    <div className="relative">
+                      <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        className="pl-10 h-12 border-gray-200 focus:border-[#ED1C24] focus:ring-[#ED1C24] rounded-xl"
+                        required
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="signin-password" className="text-sm font-semibold text-gray-700">
+                      Password
+                    </Label>
+                    <div className="relative">
+                      <Lock size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                      <Input
+                        id="signin-password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter your password"
+                        value={formData.password}
+                        onChange={(e) => handleInputChange('password', e.target.value)}
+                        className="pl-10 pr-10 h-12 border-gray-200 focus:border-[#ED1C24] focus:ring-[#ED1C24] rounded-xl"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={togglePasswordVisibility}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-sm text-[#ED1C24] hover:text-[#C41E3A] font-medium transition-colors"
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  
+                  <Button 
+                    type="submit" 
+                    disabled={loading || !formData.email || !formData.password}
+                    className="w-full h-12 bg-gradient-to-r from-[#ED1C24] to-[#C41E3A] hover:from-[#C41E3A] hover:to-[#A01B2E] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                  >
+                    {loading ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Signing in...</span>
+                      </div>
+                    ) : (
+                      'Sign In'
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Reset Password</h3>
+                    <p className="text-sm text-gray-600">
+                      Enter your email address and we'll send you instructions to reset your password.
+                    </p>
+                  </div>
+                  
                 <div className="space-y-2">
-                  <Label htmlFor="signin-email" className="text-sm font-semibold text-gray-700">
+                    <Label htmlFor="reset-email" className="text-sm font-semibold text-gray-700">
                     Email Address
                   </Label>
                   <div className="relative">
                     <Mail size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                     <Input
-                      id="signin-email"
+                        id="reset-email"
                       type="email"
                       placeholder="Enter your email"
                       value={formData.email}
@@ -109,46 +220,32 @@ export const LoginForm: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="signin-password" className="text-sm font-semibold text-gray-700">
-                    Password
-                  </Label>
-                  <div className="relative">
-                    <Lock size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <Input
-                      id="signin-password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      value={formData.password}
-                      onChange={(e) => handleInputChange('password', e.target.value)}
-                      className="pl-10 pr-10 h-12 border-gray-200 focus:border-[#ED1C24] focus:ring-[#ED1C24] rounded-xl"
-                      required
-                    />
-                    <button
+                  <div className="flex space-x-3">
+                    <Button
                       type="button"
-                      onClick={togglePasswordVisibility}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      variant="outline"
+                      onClick={() => setShowForgotPassword(false)}
+                      className="flex-1 h-12 border-gray-200 hover:bg-gray-50 rounded-xl"
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
+                      Back to Sign In
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={loading || !formData.email}
+                      className="flex-1 h-12 bg-gradient-to-r from-[#ED1C24] to-[#C41E3A] hover:from-[#C41E3A] hover:to-[#A01B2E] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                    >
+                      {loading ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Sending...</span>
+                        </div>
+                      ) : (
+                        'Send Reset Email'
+                      )}
+                    </Button>
                   </div>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  disabled={loading || !formData.email || !formData.password}
-                  className="w-full h-12 bg-gradient-to-r from-[#ED1C24] to-[#C41E3A] hover:from-[#C41E3A] hover:to-[#A01B2E] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50"
-                >
-                  {loading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      <span>Signing in...</span>
-                    </div>
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
+                </form>
+              )}
             </TabsContent>
 
             <TabsContent value="signup" className="space-y-4 mt-6">

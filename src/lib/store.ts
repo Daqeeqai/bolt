@@ -39,6 +39,7 @@ interface AppState {
   signUp: (email: string, password: string, fullName: string, role?: 'admin' | 'agent') => Promise<boolean>;
   signIn: (email: string, password: string) => Promise<boolean>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<boolean>;
   loadDashboardData: () => Promise<void>;
   loadTravelers: () => Promise<void>;
   loadConversations: () => Promise<void>;
@@ -117,6 +118,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       
       // Load dashboard data after successful sign in
       await get().loadDashboardData();
+      
+      return true;
+    } catch (error) {
+      set({ error: (error as Error).message });
+      return false;
+    } finally {
+      set({ loading: false });
+    }
+  },
+  
+  resetPassword: async (email: string) => {
+    set({ loading: true, error: null });
+    try {
+      const { error } = await AuthService.resetPassword(email);
+      
+      if (error) {
+        set({ error: error.message });
+        return false;
+      }
       
       return true;
     } catch (error) {
