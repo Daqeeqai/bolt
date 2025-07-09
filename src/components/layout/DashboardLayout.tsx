@@ -11,9 +11,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
   const { sidebarOpen } = useAppStore();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
       <Sidebar />
-      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-16'}`}>
+      <div className={`transition-all duration-400 ease-out ${sidebarOpen ? 'ml-72' : 'ml-20'}`}>
         <Header />
         <main className="p-6">
           {children}
