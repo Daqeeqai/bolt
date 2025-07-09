@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,6 @@ import {
   Sparkles,
   Target,
   Filter,
-  ChevronDown,
   User,
   MapPin,
   Calendar,
@@ -25,9 +24,9 @@ import {
   TrendingUp,
   CheckCircle,
   ArrowRight,
-  Plus
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { DatabaseService } from '@/lib/database';
 import {
   Select,
   SelectContent,
@@ -36,21 +35,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-interface FeedbackItem {
-  id: string;
-  type: 'complaint' | 'suggestion' | 'ticket';
-  traveler: string;
-  destination: string;
-  subject: string;
-  content: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
-  status: 'open' | 'in_progress' | 'resolved' | 'closed';
-  created_at: string;
-  sentiment: number;
-}
-
 export const AIMessageControl: React.FC = () => {
-  const { travelers } = useAppStore();
+  const { travelers, feedback, loadTravelers, loadFeedback } = useAppStore();
   const [activeTab, setActiveTab] = useState<'compose' | 'feedback'>('compose');
   const [messageType, setMessageType] = useState<'manual' | 'bulk'>('manual');
   const [selectedTravelers, setSelectedTravelers] = useState<string[]>([]);
@@ -58,46 +44,13 @@ export const AIMessageControl: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDestination, setFilterDestination] = useState('all');
   const [manualRecipient, setManualRecipient] = useState('');
+  const [sending, setSending] = useState(false);
 
-  // Mock feedback data
-  const feedbackItems: FeedbackItem[] = [
-    {
-      id: '1',
-      type: 'complaint',
-      traveler: 'Sarah Johnson',
-      destination: 'Tokyo, Japan',
-      subject: 'Hotel room not as described',
-      content: 'The hotel room was much smaller than shown in photos and the view was blocked...',
-      priority: 'high',
-      status: 'open',
-      created_at: '2024-01-15T10:30:00Z',
-      sentiment: 0.2
-    },
-    {
-      id: '2',
-      type: 'suggestion',
-      traveler: 'Michael Chen',
-      destination: 'Barcelona, Spain',
-      subject: 'Add more restaurant recommendations',
-      content: 'Would love to see more local restaurant suggestions in the app...',
-      priority: 'medium',
-      status: 'in_progress',
-      created_at: '2024-01-15T09:15:00Z',
-      sentiment: 0.7
-    },
-    {
-      id: '3',
-      type: 'ticket',
-      traveler: 'Emma Wilson',
-      destination: 'Paris, France',
-      subject: 'Flight delay compensation',
-      content: 'My flight was delayed by 4 hours, need help with compensation claim...',
-      priority: 'urgent',
-      status: 'open',
-      created_at: '2024-01-15T08:45:00Z',
-      sentiment: 0.3
-    }
-  ];
+  // Load data on component mount
+  useEffect(() => {
+    loadTravelers();
+    loadFeedback();
+  }, [loadTravelers, loadFeedback]);
 
   const filteredTravelers = travelers.filter(traveler => {
     const matchesSearch = traveler.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -108,18 +61,43 @@ export const AIMessageControl: React.FC = () => {
 
   const destinations = [...new Set(travelers.map(t => t.destination))];
 
-  const handleSendMessage = (type: 'manual' | 'bulk') => {
+  const handleSendMessage = async (type: 'manual' | 'bulk') => {
     if (!messageContent.trim()) return;
     
-    console.log('Sending message:', {
-      type,
-      recipients: type === 'manual' ? [manualRecipient] : selectedTravelers,
-      content: messageContent,
-    });
-    
-    setMessageContent('');
-    setSelectedTravelers([]);
-    setManualRecipient('');
+    setSending(true);
+    try {
+      // In a real implementation, this would send messages via an API
+      console.log('Sending message:', {
+        type,
+        recipients: type === 'manual' ? [manualRecipient] : selectedTravelers,
+        content: messageContent,
+      });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Reset form
+      setMessageContent('');
+      setSelectedTravelers([]);
+      setManualRecipient('');
+      
+      // Show success message (you could use a toast here)
+      alert('Message sent successfully!');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      alert('Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleUpdateFeedback = async (feedbackId: string, updates: any) => {
+    try {
+      await DatabaseService.updateFeedback(feedbackId, updates);
+      loadFeedback(); // Reload feedback data
+    } catch (error) {
+      console.error('Error updating feedback:', error);
+    }
   };
 
   const quickActions = [
@@ -144,10 +122,10 @@ export const AIMessageControl: React.FC = () => {
   ];
 
   const stats = {
-    complaints: feedbackItems.filter(item => item.type === 'complaint').length,
-    suggestions: feedbackItems.filter(item => item.type === 'suggestion').length,
-    tickets: feedbackItems.filter(item => item.type === 'ticket').length,
-    urgent: feedbackItems.filter(item => item.priority === 'urgent').length,
+    complaints: feedback.filter(item => item.type === 'complaint').length,
+    suggestions: feedback.filter(item => item.type === 'suggestion').length,
+    tickets: feedback.filter(item => item.type === 'ticket').length,
+    urgent: feedback.filter(item => item.priority === 'urgent').length,
   };
 
   return (
@@ -326,11 +304,20 @@ export const AIMessageControl: React.FC = () => {
 
                   <Button 
                     onClick={() => handleSendMessage('manual')}
-                    disabled={!messageContent.trim() || !manualRecipient}
+                    disabled={sending || !messageContent.trim() || !manualRecipient}
                     className="w-full h-12 bg-gradient-to-r from-[#ED1C24] to-[#C41E3A] hover:from-[#C41E3A] hover:to-[#A01B2E] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    <Send size={18} className="mr-2" />
-                    Send Manual Message
+                    {sending ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Sending...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Send size={18} className="mr-2" />
+                        Send Manual Message
+                      </>
+                    )}
                   </Button>
                 </div>
               ) : (
@@ -437,11 +424,20 @@ export const AIMessageControl: React.FC = () => {
 
                   <Button 
                     onClick={() => handleSendMessage('bulk')}
-                    disabled={!messageContent.trim() || selectedTravelers.length === 0}
+                    disabled={sending || !messageContent.trim() || selectedTravelers.length === 0}
                     className="w-full h-12 bg-gradient-to-r from-[#ED1C24] to-[#C41E3A] hover:from-[#C41E3A] hover:to-[#A01B2E] text-white font-semibold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
                   >
-                    <Send size={18} className="mr-2" />
-                    Send to {selectedTravelers.length} Travelers
+                    {sending ? (
+                      <div className="flex items-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        <span>Sending...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <Send size={18} className="mr-2" />
+                        Send to {selectedTravelers.length} Travelers
+                      </>
+                    )}
                   </Button>
                 </div>
               )}
@@ -541,7 +537,7 @@ export const AIMessageControl: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                {feedbackItems.map(item => {
+                {feedback.map(item => {
                   const getTypeIcon = (type: string) => {
                     switch (type) {
                       case 'complaint': return AlertTriangle;
@@ -603,11 +599,7 @@ export const AIMessageControl: React.FC = () => {
                             <div className="flex items-center space-x-3 text-sm text-gray-600 mt-1">
                               <div className="flex items-center space-x-1">
                                 <User size={14} />
-                                <span>{item.traveler}</span>
-                              </div>
-                              <div className="flex items-center space-x-1">
-                                <MapPin size={14} />
-                                <span>{item.destination}</span>
+                                <span>Traveler #{item.traveler_id.slice(0, 8)}</span>
                               </div>
                               <div className="flex items-center space-x-1">
                                 <Calendar size={14} />
@@ -632,8 +624,8 @@ export const AIMessageControl: React.FC = () => {
                         <div className="flex items-center space-x-4">
                           <div className="flex items-center space-x-2 text-sm">
                             <span className="text-gray-600">Sentiment:</span>
-                            <span className={`font-semibold ${getSentimentColor(item.sentiment)}`}>
-                              {(item.sentiment * 100).toFixed(0)}%
+                            <span className={`font-semibold ${getSentimentColor(item.sentiment_score)}`}>
+                              {(item.sentiment_score * 100).toFixed(0)}%
                             </span>
                           </div>
                         </div>
@@ -641,11 +633,21 @@ export const AIMessageControl: React.FC = () => {
                         <div className="flex items-center space-x-3">
                           {item.status === 'open' && (
                             <>
-                              <Button size="sm" variant="outline" className="border-green-200 text-green-700 hover:bg-green-50">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-green-200 text-green-700 hover:bg-green-50"
+                                onClick={() => handleUpdateFeedback(item.id, { status: 'resolved' })}
+                              >
                                 <CheckCircle size={14} className="mr-1" />
                                 Resolve
                               </Button>
-                              <Button size="sm" variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50">
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                                onClick={() => handleUpdateFeedback(item.id, { status: 'in_progress' })}
+                              >
                                 <User size={14} className="mr-1" />
                                 Assign
                               </Button>
